@@ -107,6 +107,44 @@ function dbBins(countryId, countyId, settlementId) {
   return s ? s.bins : null;
 }
 
+function buildNotifyAutomation(title, bins, notifyService, notifyTime, automationId) {
+  const binsData = bins.map((b) => ({
+    label: b.label,
+    dates: (b.dates || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  }));
+  return {
+    alias: (title || 'Smeće') + ' – obavijest dan prije odvoza',
+    description: 'Automatski kreirano i održavano preko smece-card kartice. Ne mijenjaj ručno — promjene se prepisuju kod svake izmjene postavki kartice.',
+    trigger: [{ trigger: 'time', at: notifyTime }],
+    condition: [],
+    action: [
+      {
+        variables: {
+          tomorrow: "{{ (now() + timedelta(days=1)).strftime('%Y-%m-%d') }}",
+          bins_data: binsData,
+          due: "{% set ns = namespace(d=[]) %}{% for b in bins_data %}{% if tomorrow in b.dates %}{% set ns.d = ns.d + [b.label] %}{% endif %}{% endfor %}{{ ns.d | join(', ') }}",
+        },
+      },
+      {
+        if: [{ condition: 'template', value_template: '{{ due != \'\' }}' }],
+        then: [
+          {
+            service: 'notify.' + notifyService,
+            data: {
+              title: 'Sutra je odvoz otpada',
+              message: 'Sutra se odvozi: {{ due }}',
+            },
+          },
+        ],
+      },
+    ],
+    mode: 'single',
+  };
+}
+
 // ============================================================
 // EDITOR — setup wizard (country -> county -> settlement)
 // ============================================================
@@ -239,6 +277,78 @@ class SmeceCardEditor extends HTMLElement {
       wrap.appendChild(info);
     }
 
+    if (country && county && settlement) {
+      const notifyWrap = document.createElement('div');
+      notifyWrap.style.marginTop = '18px';
+      notifyWrap.style.paddingTop = '14px';
+      notifyWrap.style.borderTop = '1px solid var(--divider-color, #444)';
+
+      const notifyHeader = document.createElement('div');
+      notifyHeader.textContent = 'Notifikacije';
+      notifyHeader.style.fontWeight = '600';
+      notifyHeader.style.marginBottom = '8px';
+      notifyWrap.appendChild(notifyHeader);
+
+      const toggleRow = document.createElement('div');
+      toggleRow.style.display = 'flex';
+      toggleRow.style.alignItems = 'center';
+      toggleRow.style.gap = '10px';
+      toggleRow.style.marginBottom = '10px';
+      const toggle = document.createElement('ha-switch');
+      toggle.checked = !!cfg.notify_enabled;
+      toggle.addEventListener('change', (e) =>
+        this._configChanged({ notify_enabled: e.target.checked })
+      );
+      const toggleLabel = document.createElement('span');
+      toggleLabel.textContent = 'Pošalji podsjetnik dan prije odvoza';
+      toggleLabel.style.fontSize = '.85rem';
+      toggleRow.appendChild(toggle);
+      toggleRow.appendChild(toggleLabel);
+      notifyWrap.appendChild(toggleRow);
+
+      if (cfg.notify_enabled) {
+        const services = (this._hass && this._hass.services && this._hass.services.notify) || {};
+        const serviceIds = Object.keys(services).filter(
+          (s) => s !== 'notify' && s !== 'persistent_notification'
+        );
+        const serviceOptions = serviceIds.map((id) => ({ id, name: id }));
+        notifyWrap.appendChild(
+          makeSelect('Pošalji na (notify servis)', serviceOptions, cfg.notify_service || '', (val) =>
+            this._configChanged({ notify_service: val })
+          )
+        );
+
+        const timeField = document.createElement('ha-textfield');
+        timeField.label = 'Vrijeme slanja (HH:MM:SS)';
+        timeField.value = cfg.notify_time || '20:00:00';
+        timeField.style.display = 'block';
+        timeField.style.marginBottom = '14px';
+        timeField.addEventListener('change', (e) => {
+          let v = e.target.value.trim();
+          if (/^\d{2}:\d{2}$/.test(v)) v = v + ':00';
+          this._configChanged({ notify_time: v });
+        });
+        notifyWrap.appendChild(timeField);
+
+        if (!serviceIds.length) {
+          const warn = document.createElement('div');
+          warn.style.fontSize = '.78rem';
+          warn.style.color = 'var(--secondary-text-color)';
+          warn.textContent =
+            'Nije pronađen nijedan notify servis (npr. mobilna aplikacija) povezan s Home Assistantom.';
+          notifyWrap.appendChild(warn);
+        } else if (!cfg.notify_service) {
+          const warn = document.createElement('div');
+          warn.style.fontSize = '.78rem';
+          warn.style.color = 'var(--secondary-text-color)';
+          warn.textContent = 'Odaberi na koji uređaj/servis se šalje obavijest.';
+          notifyWrap.appendChild(warn);
+        }
+      }
+
+      wrap.appendChild(notifyWrap);
+    }
+
     this.innerHTML = '';
     this.appendChild(wrap);
   }
@@ -282,10 +392,57 @@ class SmeceCard extends HTMLElement {
     }
     this._selectedAreaIndex = areas ? Math.min(storedIdx, areas.length - 1) : 0;
     this._render();
+    this._syncNotifyAutomation();
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._syncNotifyAutomation();
+  }
+
+  async _syncNotifyAutomation() {
+    if (!this._hass || !this.config) return;
+    const cfg = this.config;
+    const sig = JSON.stringify({
+      e: !!cfg.notify_enabled,
+      s: cfg.notify_service || '',
+      t: cfg.notify_time || '',
+      c: cfg.country || '',
+      co: cfg.county || '',
+      se: cfg.settlement || '',
+      ttl: cfg.title || '',
+    });
+    if (this._notifySyncedFor === sig) return;
+    this._notifySyncedFor = sig;
+
+    const automationId = 'smece_notify_' + (cfg.settlement || 'custom') + '_' + (cfg.storage_key || 'default');
+
+    if (!cfg.notify_enabled || !cfg.notify_service) {
+      try {
+        await this._hass.callApi('DELETE', 'config/automation/config/' + automationId);
+        await this._hass.callService('automation', 'reload', {});
+      } catch (e) {
+        /* nothing to delete, or reload failed — not fatal */
+      }
+      return;
+    }
+
+    if (!this._areas || !this._areas[this._selectedAreaIndex || 0]) return;
+    const bins = this._areas[this._selectedAreaIndex || 0].bins;
+    const automation = buildNotifyAutomation(
+      cfg.title || 'Smeće',
+      bins,
+      cfg.notify_service,
+      cfg.notify_time || '20:00:00',
+      automationId
+    );
+
+    try {
+      await this._hass.callApi('POST', 'config/automation/config/' + automationId, automation);
+      await this._hass.callService('automation', 'reload', {});
+    } catch (e) {
+      console.error('smece-card: ne mogu postaviti automatizaciju za notifikacije', e);
+    }
   }
 
   getCardSize() {
