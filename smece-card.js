@@ -318,17 +318,29 @@ class SmeceCardEditor extends HTMLElement {
           )
         );
 
-        const timeField = document.createElement('ha-textfield');
-        timeField.label = 'Vrijeme slanja (HH:MM:SS)';
-        timeField.value = cfg.notify_time || '20:00:00';
-        timeField.style.display = 'block';
-        timeField.style.marginBottom = '14px';
-        timeField.addEventListener('change', (e) => {
-          let v = e.target.value.trim();
-          if (/^\d{2}:\d{2}$/.test(v)) v = v + ':00';
-          this._configChanged({ notify_time: v });
+        const timeRow = document.createElement('div');
+        timeRow.style.marginBottom = '14px';
+        const timeLabel = document.createElement('div');
+        timeLabel.textContent = 'Vrijeme slanja notifikacije';
+        timeLabel.style.fontSize = '.78rem';
+        timeLabel.style.marginBottom = '4px';
+        timeLabel.style.color = 'var(--secondary-text-color)';
+        timeRow.appendChild(timeLabel);
+        const timeInput = document.createElement('input');
+        timeInput.type = 'time';
+        timeInput.value = (cfg.notify_time || '20:00').slice(0, 5);
+        timeInput.style.width = '100%';
+        timeInput.style.padding = '8px';
+        timeInput.style.borderRadius = '6px';
+        timeInput.style.background = 'var(--card-background-color, #1c1c1c)';
+        timeInput.style.color = 'var(--primary-text-color)';
+        timeInput.style.border = '1px solid var(--divider-color, #444)';
+        timeInput.style.boxSizing = 'border-box';
+        timeInput.addEventListener('change', (e) => {
+          if (e.target.value) this._configChanged({ notify_time: e.target.value });
         });
-        notifyWrap.appendChild(timeField);
+        timeRow.appendChild(timeInput);
+        notifyWrap.appendChild(timeRow);
 
         if (!serviceIds.length) {
           const warn = document.createElement('div');
