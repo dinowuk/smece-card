@@ -13,11 +13,34 @@ class SmeceCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config || !Array.isArray(config.bins) || config.bins.length === 0) {
-      throw new Error('smece-card: "bins" must be a non-empty array');
+    if (!config) throw new Error('smece-card: config required');
+    let areas;
+    if (Array.isArray(config.areas) && config.areas.length > 0) {
+      areas = config.areas;
+    } else if (Array.isArray(config.bins) && config.bins.length > 0) {
+      areas = [{ name: null, bins: config.bins }];
+    } else {
+      throw new Error('smece-card: provide either "bins" (single area) or "areas" (multiple areas)');
     }
     this.config = config;
+    this._areas = areas;
+    let storedIdx = 0;
+    try {
+      const key = 'smece-card-selected-area-' + (config.storage_key || 'default');
+      const stored = window.localStorage.getItem(key);
+      if (stored !== null) storedIdx = parseInt(stored, 10) || 0;
+    } catch (e) { /* localStorage unavailable, ignore */ }
+    this._selectedAreaIndex = Math.min(storedIdx, areas.length - 1);
     this._rendered = false;
+    this._render();
+  }
+
+  _selectArea(idx) {
+    this._selectedAreaIndex = idx;
+    try {
+      const key = 'smece-card-selected-area-' + (this.config.storage_key || 'default');
+      window.localStorage.setItem(key, String(idx));
+    } catch (e) { /* ignore */ }
     this._render();
   }
 
@@ -34,41 +57,47 @@ class SmeceCard extends HTMLElement {
   static getStubConfig() {
     return {
       title: 'Odvoz otpada',
-      bins: [
+      storage_key: 'demo',
+      areas: [
         {
-          id: 'bio',
-          label: 'Bio otpad',
-          color: '#8a5a34',
-          lid_color: '#6e4527',
-          dates: '2026-01-09,2026-01-20,2026-02-03,2026-02-17',
-        },
-        {
-          id: 'mixed',
-          label: 'Miješani',
-          color: '#4caf50',
-          lid_color: '#3d8c40',
-          dates: '2026-01-09,2026-01-20,2026-02-03,2026-02-17',
-        },
-        {
-          id: 'paper',
-          label: 'Papir',
-          color: '#2196f3',
-          lid_color: '#1976d2',
-          dates: '2026-01-14,2026-02-11,2026-03-11',
-        },
-        {
-          id: 'plastic',
-          label: 'Plastika',
-          color: '#f5d020',
-          lid_color: '#d4b40f',
-          dates: '2026-01-14,2026-02-11,2026-03-11',
-        },
-        {
-          id: 'glass',
-          label: 'Metal/Staklo',
-          color: '#9e9e9e',
-          lid_color: '#7d7d7d',
-          dates: '2026-01-17,2026-02-14,2026-03-14',
+          name: 'Moje naselje',
+          bins: [
+            {
+              id: 'bio',
+              label: 'Bio otpad',
+              color: '#8a5a34',
+              lid_color: '#6e4527',
+              dates: '2026-01-09,2026-01-20,2026-02-03,2026-02-17',
+            },
+            {
+              id: 'mixed',
+              label: 'Miješani',
+              color: '#4caf50',
+              lid_color: '#3d8c40',
+              dates: '2026-01-09,2026-01-20,2026-02-03,2026-02-17',
+            },
+            {
+              id: 'paper',
+              label: 'Papir',
+              color: '#2196f3',
+              lid_color: '#1976d2',
+              dates: '2026-01-14,2026-02-11,2026-03-11',
+            },
+            {
+              id: 'plastic',
+              label: 'Plastika',
+              color: '#f5d020',
+              lid_color: '#d4b40f',
+              dates: '2026-01-14,2026-02-11,2026-03-11',
+            },
+            {
+              id: 'glass',
+              label: 'Metal/Staklo',
+              color: '#9e9e9e',
+              lid_color: '#7d7d7d',
+              dates: '2026-01-17,2026-02-14,2026-03-14',
+            },
+          ],
         },
       ],
     };
@@ -121,7 +150,10 @@ class SmeceCard extends HTMLElement {
 
   _render() {
     const cfg = this.config;
-    const bins = cfg.bins
+    const areas = this._areas;
+    const areaIdx = this._selectedAreaIndex;
+    const currentArea = areas[areaIdx];
+    const bins = currentArea.bins
       .map((bin) => {
         const dates = this._parseDates(bin.dates);
         const { days, nextDate } = this._daysUntilNext(dates);
@@ -138,7 +170,9 @@ class SmeceCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card { padding: 16px; }
-        .title { font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; color: var(--primary-text-color); }
+        .title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .title { font-size: 1.1rem; font-weight: 700; color: var(--primary-text-color); }
+        .area-select { background: var(--card-background-color, #1c1c1c); color: var(--primary-text-color); border: 1px solid var(--divider-color, #444); border-radius: 8px; padding: 4px 8px; font-size: .85rem; }
         .row { display: grid; grid-template-columns: repeat(${bins.length}, 1fr); gap: 10px; }
         .cell { text-align: center; }
         .bin-svg { width: 100%; max-width: 90px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
@@ -161,10 +195,20 @@ class SmeceCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       ${style}
       <ha-card>
-        ${cfg.title ? `<div class="title">${cfg.title}</div>` : ''}
+        <div class="title-row">
+          ${cfg.title ? `<div class="title">${cfg.title}</div>` : ''}
+          ${areas.length > 1 ? `<select class="area-select" id="areaSelect">${areas.map((a, i) => `<option value="${i}" ${i === areaIdx ? 'selected' : ''}>${a.name || 'Područje ' + (i + 1)}</option>`).join('')}</select>` : ''}
+        </div>
         <div class="row">${cellsHtml}</div>
       </ha-card>
     `;
+
+    const selectEl = this.shadowRoot.getElementById('areaSelect');
+    if (selectEl) {
+      selectEl.addEventListener('change', (e) => {
+        this._selectArea(parseInt(e.target.value, 10));
+      });
+    }
   }
 }
 
