@@ -1,14 +1,27 @@
 # smece-card
 
-A self-contained Home Assistant Lovelace card for waste/bin collection countdowns — no external calendar integration, no template sensors, no `calendar:` entities required. The full schedule lives directly in the card's own YAML config, and the card computes "days until next collection" itself, client-side, for each bin.
+A self-contained Home Assistant Lovelace card for waste/bin collection countdowns — no external calendar integration, no template sensors, no `calendar:` entities required.
 
-Built for household waste schedules in Croatia (and easily adaptable anywhere), where most municipal waste companies publish a yearly PDF/paper calendar rather than a machine-readable API.
+**Setup wizard**: open the card's visual editor and pick your **Country → County (županija) → Settlement (naselje)** — the card ships with a small built-in database of verified schedules (currently Croatia / Međimurje county, growing over time) and configures itself automatically. No YAML needed for supported locations.
+
+**Not in the database yet?** You can still configure the card manually with a full schedule pasted directly into its config (`bins:` or `areas:`, see below) — the same mechanism the built-in database entries use under the hood.
+
+Built for household waste schedules in Croatia (and easily adaptable anywhere), where most municipal waste companies publish a yearly PDF/image calendar rather than a machine-readable API. Every date in the built-in database was verified by rendering the source PDF/image and reading the actual colour-coded calendar, not guessed or scraped blindly — see the project's `CLAUDE.md`-style notes in the commit history for the verification process per settlement.
 
 ![screenshot placeholder](https://github.com/user-attachments/assets/placeholder)
 
 ## Why not use `calendar:` / a template sensor?
 
 You can, but for a fixed yearly schedule (the common case for Croatian "komunalno poduzeće" waste calendars) it's simpler to keep the whole thing self-contained in one card: no `configuration.yaml` edits, no restarts to change a date — just edit the card's own config from the dashboard UI and it updates immediately.
+
+## Supported locations (built-in database)
+
+| Country | County | Settlement | Source |
+|---|---|---|---|
+| Croatia | Međimurska županija | Križovec / Peklenica | Murs-ekom d.o.o. |
+| Croatia | Međimurska županija | Dekanovec | GKP PRE-KOM d.o.o. |
+
+More settlements are added incrementally as they're verified (Croatia has no existing open-source coverage for this — see [mampfes/hacs_waste_collection_schedule](https://github.com/mampfes/hacs_waste_collection_schedule), which has ~977 sources worldwide but zero for Croatia/Serbia/Bosnia). If your settlement isn't listed, open an issue with a link to your municipality's published calendar (PDF, image, or web page), or use the manual `bins:`/`areas:` config below in the meantime.
 
 ## Installation
 
