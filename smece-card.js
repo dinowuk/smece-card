@@ -121,11 +121,18 @@ class SmeceCard extends HTMLElement {
 
   _render() {
     const cfg = this.config;
-    const bins = cfg.bins.map((bin) => {
-      const dates = this._parseDates(bin.dates);
-      const { days, nextDate } = this._daysUntilNext(dates);
-      return { ...bin, days, nextDate };
-    });
+    const bins = cfg.bins
+      .map((bin) => {
+        const dates = this._parseDates(bin.dates);
+        const { days, nextDate } = this._daysUntilNext(dates);
+        return { ...bin, days, nextDate };
+      })
+      .sort((a, b) => {
+        if (a.days === null && b.days === null) return 0;
+        if (a.days === null) return 1;
+        if (b.days === null) return -1;
+        return a.days - b.days;
+      });
 
     const style = `
       <style>
