@@ -73,9 +73,34 @@ bins:
 | `lid_color` | no | Bin lid colour (defaults to `color` if omitted) |
 | `dates` | yes | Comma-separated list of collection dates in `YYYY-MM-DD` format |
 
-The card always shows **today's date's nearest upcoming entry** per bin: a live day-count ("X d", or "DANAS" / "SUTRA" for today/tomorrow), plus the exact next date underneath. When you reach a new year, just paste in next year's dates from your municipality's new calendar.
+The card always shows **today's date's nearest upcoming entry** per bin: a live day-count ("X d", or "DANAS" / "SUTRA" for today/tomorrow), plus the exact next date underneath. Bins are automatically sorted so the soonest pickup is shown first. When you reach a new year, just paste in next year's dates from your municipality's new calendar.
 
-There is no visual editor yet — edit the config in YAML mode (click the card, "Edit in YAML"). A visual editor (add/remove bins, per-bin colour picker) is a natural next step.
+## Multiple areas / settlements (picker)
+
+If you (or people you share the dashboard with) need schedules for more than one settlement, street zone, or address, use `areas` instead of a top-level `bins` list:
+
+```yaml
+type: custom:smece-card
+title: "Odvoz otpada"
+storage_key: "my-card-1"   # optional, only needed if you have more than one multi-area smece-card on the same dashboard
+areas:
+  - name: "Naselje A"
+    bins:
+      - id: bio
+        label: "Bio otpad"
+        color: "#8a5a34"
+        dates: "2026-01-09,2026-01-20"
+  - name: "Naselje B"
+    bins:
+      - id: bio
+        label: "Bio otpad"
+        color: "#8a5a34"
+        dates: "2026-01-12,2026-01-26"
+```
+
+With 2+ areas, a dropdown appears in the card header letting the viewer switch between them. The chosen area is remembered per-browser (not synced between devices/viewers). With exactly one area (or the old top-level `bins:` format), no dropdown is shown — fully backward compatible with existing configs.
+
+There is no visual editor yet — edit the config in YAML mode (click the card, "Edit in YAML"). A visual editor (add/remove bins and areas, per-bin colour picker) is a natural next step.
 
 ## Roadmap
 
