@@ -1544,8 +1544,8 @@ class SmeceCard extends HTMLElement {
         .title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
         .title { font-size: 1.1rem; font-weight: 700; color: var(--primary-text-color); }
         .area-select { background: var(--card-background-color, #1c1c1c); color: var(--primary-text-color); border: 1px solid var(--divider-color, #444); border-radius: 8px; padding: 4px 8px; font-size: .85rem; }
-        .row { display: grid; grid-template-columns: repeat(${bins.length}, 1fr); gap: 10px; }
-        .cell { text-align: center; }
+        .row { display: grid; grid-template-columns: repeat(${bins.length}, minmax(0, 1fr)); gap: 10px; }
+        .cell { text-align: center; min-width: 0; }
         .bin-svg { width: 100%; max-width: 90px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
         .bin-label { margin-top: 6px; font-size: .72rem; font-weight: 600; color: var(--secondary-text-color); line-height: 1.2; }
         .next-date { font-size: .62rem; color: var(--disabled-text-color, #888); margin-top: 2px; }
