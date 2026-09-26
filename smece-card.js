@@ -1130,6 +1130,24 @@ function dbBins(countryId, countyId, settlementId) {
   return s ? s.bins : null;
 }
 
+function isEditorPreviewContext(el) {
+  let node = el;
+  for (let i = 0; i < 40 && node; i++) {
+    const tag = (node.tagName || '').toUpperCase();
+    if (tag.includes('PREVIEW') || tag.includes('EDIT-CARD') || tag.includes('DIALOG')) {
+      return true;
+    }
+    if (node.parentElement) {
+      node = node.parentElement;
+    } else if (node.getRootNode && node.getRootNode().host) {
+      node = node.getRootNode().host;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
 function buildNotifyAutomation(title, bins, notifyService, notifyTime, automationId) {
   const binsData = bins.map((b) => ({
     label: b.label,
@@ -1437,6 +1455,7 @@ class SmeceCard extends HTMLElement {
 
   async _syncNotifyAutomation() {
     if (!this._hass || !this.config) return;
+    if (isEditorPreviewContext(this)) return;
     const cfg = this.config;
     const sig = JSON.stringify({
       e: !!cfg.notify_enabled,
